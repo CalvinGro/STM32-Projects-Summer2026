@@ -24,7 +24,9 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "imu_logger.h"
+#include "6050_logic.h"
+#include <stdint.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -56,6 +58,10 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+#define BUTTON_HOLD_TIME 3000U
+#define DEBOUNCE_PAUSE   50U
+
+
 
 /* USER CODE END 0 */
 
@@ -92,6 +98,24 @@ int main(void)
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
 
+  static bool recording;
+  bool dumped;
+  MPU6050Sample mpu6050_data;
+  FullIMUSample full_sample;
+
+  char err_msg[100];
+  HAL_StatusTypeDef status;
+
+  status = MPU6050_init();
+  snprintf(err_msg, "Status after MPU6050 init: %d", status);
+  uart_print(err_msg);
+
+  status = logger_init();
+  snprintf(err_msg, "Status after MPU6050 init: %d", status);
+  uart_print(err_msg);
+
+
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -101,6 +125,99 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	  dumped = false;
+
+	  if (HAL_GPIO_READPIN(GPIOC, GPIO_PIN_13) == GPIO_PIN_RESET) {
+		  uint32_t press_start = HAL_GetTick();
+
+		  // avoid debounce
+		  HAL_Delay(DEBOUNCE_PAUSE);
+
+		  while (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13) == GPIO_PIN_RESET) {
+
+			  // if held for >3 seconds send data over uart2
+			  if (HAL_GetTick() >= press_start + 3000) {
+
+				 HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
+
+				 status = dump_flash_uart();
+
+				 snprintf(err_msg, "Status after flash data dump: %d", status);
+				 uart_print(err_msg);
+
+				 status = clear_flash();
+
+				 snprintf(err_msg, "Status after flash clear: %d", status);
+				 uart_print(err_msg);
+
+				 dumped = true;
+
+				 HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
+
+				 break;
+			  }
+		  }
+
+		  // toggle recording, only turn on if no data in flash.
+		  if (!dumped) {
+			  if (!recording && flash_empty()) {
+				  recording = !recording;
+			  } else if (recording) {
+
+				  // if recording stop and write to flash.
+				  recording = !recording;
+
+				  status = write_buf_to_flash();
+				  snprintf(err_msg, "Status after write buf to flash: %d", status);
+				  uart_print(err_msg);
+
+				  status = clear_buf();
+				  snprintf(err_msg, "Status after clear buffer: %d", status);
+				  uart_print(err_msg);
+			  }
+		  }
+	  }
+
+	  // collect data if recording
+	  if (recording) {
+		  if (!buf_full()) {
+			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
+			  status = MPU6050_get_sample(&mpu6050_data);
+
+			  snprintf(err_msg, "Status after sample read: %d", status);
+			  if (err_msg != HAL_OK) uart_print(err_msg);
+
+			  full_sample.ax = mpu6050_data.ax;
+			  full_sample.ay = mpu6050_data.ay;
+			  full_sample.az = mpu6050_data.az;
+			  full_sample.gx = mpu6050_data.gx;
+			  full_sample.gy = mpu6050_data.gy;
+			  full_sample.gz = mpu6050_data.gz;
+			  full_sample.temp = mpu6050_data.temp;
+			  full_sample.time = HAL_GetTick();
+
+			  status = write_to_buf(&full_sample);
+
+			  snprintf(err_msg, "Status after sample write: %d", status);
+			  if (err_msg != HAL_OK) uart_print(err_msg);
+			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
+		  } else {
+
+			  // if the buffer is full stop and write to flash
+			  recording = !recording;
+
+			  status = write_buf_to_flash();
+			  snprintf(err_msg, "Status after write buf to flash: %d", status);
+			  uart_print(err_msg);
+
+			  status = clear_buf();
+			  snprintf(err_msg, "Status after clear buffer: %d", status);
+			  uart_print(err_msg);
+		  }
+	  }
+
+
+
   }
   /* USER CODE END 3 */
 }
