@@ -8,8 +8,8 @@ Description - Header file for imu__logger.c.
 
 
 #include "imu_logger.h"
-#include <stdint.h>
-#include <string.h>
+#include <stdio.h>
+
 
 #define MAX_SAMPLES    4500
 #define LOG_START_ADDR 0x08060000
@@ -25,7 +25,14 @@ typedef struct {
 
 static uint16_t sample_count = 0;
 static FullIMUSample samples_buf[MAX_SAMPLES];
+char msg[100];
 
+void uart_print(char *msg) {
+	HAL_UART_Transmit(&huart2,
+			(uint8_t *)msg,
+			strlen(msg),
+			HAL_MAX_DELAY);
+}
 
 HAL_StatusTypeDef logger_init(void) {
 	sample_count = 0;
@@ -39,18 +46,22 @@ HAL_StatusTypeDef write_to_buf(FullIMUSample *sample) {
 	}
 	samples_buf[sample_count] = *sample;
 	sample_count++;
+
+	snprintf(msg, sizeof(msg), "Write sample to buffer: %lu \r\n", (unsigned long)sample->time);
+	uart_print(msg);
 	return HAL_OK;
 }
 
 
 bool buf_full(void) {
-	if (MAX_SAMPLES <= sample_count) return false;
-	return true;
+	if (MAX_SAMPLES <= sample_count) return true;
+	return false;
 }
 
 HAL_StatusTypeDef clear_buf(void) {
 	sample_count = 0;
-	memset((uint8_t *)samples_buf, 0, MAX_SAMPLES);
+	memset((uint8_t *)samples_buf, 0, MAX_SAMPLES * sizeof(FullIMUSample));
+	return HAL_OK;
 }
 
 bool flash_empty(void) {
@@ -140,7 +151,7 @@ HAL_StatusTypeDef dump_flash_uart(void) {
 	LogHeader header;
 	FullIMUSample sample;
 	HAL_StatusTypeDef status;
-	char sample_str[120];
+	char msg[120];
 
 	memcpy(&header, (const void *)LOG_START_ADDR, sizeof(header));
 	if (header.key != LOG_HEADER_KEY) return HAL_ERROR;
@@ -148,19 +159,26 @@ HAL_StatusTypeDef dump_flash_uart(void) {
 	const uint32_t log_data_addr = LOG_START_ADDR + sizeof(header);
 	const uint32_t total_data_bytes = header.sample_size * header.sample_count;
 
+	snprintf(msg, sizeof(msg), "STARTING FLASH DUMP\r\n");
+	uart_print(msg);
+
+	snprintf(msg, sizeof(msg), "ax,ay,az,gx,gy,gz,temp,time\r\n");
+	uart_print(msg);
+
 	for (uint32_t i = log_data_addr; i < total_data_bytes+log_data_addr; i += sizeof(FullIMUSample)) {
 
 		memcpy(&sample, (const void *)i, sizeof(FullIMUSample));
 
-		snprintf(sample_str, sizeof(sample_str), "%d, %d, %d, %d, %d, %d, %d, %lu\r\n",
+		snprintf(msg, sizeof(msg), "%d,%d,%d,%d,%d,%d,%d,%lu\r\n",
 													sample.ax, sample.ay, sample.az, sample.gx,
-													sample.gy, sample.gz, sample.temp, sample.time);
-		uart_print(sample_str);
+													sample.gy, sample.gz, sample.temp, (unsigned long)sample.time);
+		uart_print(msg);
 	}
 
-	status = clear_flash_sector_7();
-	if (status != HAL_OK) return status;
+	snprintf(msg, sizeof(msg), "FINISHED FLASH DUMP\r\n");
+	uart_print(msg);
 
+	status = clear_flash_sector_7();
 	return status;
 }
 

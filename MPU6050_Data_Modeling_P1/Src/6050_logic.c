@@ -8,6 +8,8 @@ Description - This declares 2 functions. One to initalize the MPU6050 which is t
 */
 
 #include "6050_logic.h"
+#include "i2c.h"
+#include <string.h>
 
 
 

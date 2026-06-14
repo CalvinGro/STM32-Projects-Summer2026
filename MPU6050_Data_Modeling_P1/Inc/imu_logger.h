@@ -10,14 +10,13 @@ Description - Header file for imu__logger.c.
 
 #ifndef IMU_LOGGER_H
 
+#include <stdint.h>
+#include <string.h>
+#include <stdbool.h>
+#include "main.h"
+#include "usart.h"
 
-
-void uart_print(char *msg) {
-	HAL_UART_Transmit(&huart2,
-			(uint8_t *)msg,
-			strlen(msg),
-			HAL_MAX_DELAY);
-}
+void uart_print(char *msg);
 
 typedef struct {
 	uint32_t time;
