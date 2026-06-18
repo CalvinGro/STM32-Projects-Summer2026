@@ -33,6 +33,13 @@ HAL_StatusTypeDef MPU6050_init(void){
 	if (who_am_i == 0x0) {
 		return HAL_ERROR;
 	}
+
+	// setting config bit for accel enabling a -4g to 4g range.
+	uint8_t config_8g_range;
+	HAL_I2C_Mem_Read(&hi2c1, MPU6050_ADR, MPU6050_ACCEL_CONFIG, I2C_MEMADD_SIZE_8BIT, &config_8g_range, 1, HAL_MAX_DELAY);
+	config_8g_range = (config_8g_range & 0xEF) | 0x08;
+	HAL_I2C_Mem_Write(&hi2c1, MPU6050_ADR, MPU6050_ACCEL_CONFIG, I2C_MEMADD_SIZE_8BIT, &config_8g_range, 1, HAL_MAX_DELAY);
+
 	return HAL_OK;
 }
 
