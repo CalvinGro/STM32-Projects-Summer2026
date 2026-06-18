@@ -8,7 +8,7 @@ GYRO_SCALE = 131.0
 GRAV_MS2 = 9.80665
 ALPHA = 0.98           # percentage of filtered sample take from gyro sample (remaining .02 from accel)
 
-df = pd.read_csv("MPU6050_Data_Modeling_P1/Data Modeling/imu_log.csv")
+df = pd.read_csv("MPU6050_Data_Modeling_P1/Data Modeling/data/imu_log.csv")
 
 raw_accel_x = df["ax"].to_numpy(dtype=float)
 raw_accel_y = df["ay"].to_numpy(dtype=float)
@@ -22,13 +22,13 @@ time = df["time"].to_numpy(dtype=int)
 temp = df["temp"].to_numpy(dtype=float)
 
 # converts from Gs to meters per sec squared
-accel_x = (raw_accel_x / ACCEL_SCALE) * GRAV_MS2
-accel_y = (raw_accel_y / ACCEL_SCALE) * GRAV_MS2
-accel_z = (raw_accel_z / ACCEL_SCALE) * GRAV_MS2
+df["ax"] = accel_x = (raw_accel_x / ACCEL_SCALE) * GRAV_MS2
+df["ay"] = accel_y = (raw_accel_y / ACCEL_SCALE) * GRAV_MS2
+df["az"] = accel_z = (raw_accel_z / ACCEL_SCALE) * GRAV_MS2
 
-gyro_x = raw_gyro_x / 131
-gyro_y = raw_gyro_y / 131
-gyro_z = raw_gyro_z / 131
+df["gx"] = gyro_x = raw_gyro_x / 131
+df["gy"] = gyro_y = raw_gyro_y / 131
+df["gz"] = gyro_z = raw_gyro_z / 131
 
 # implementation of Complementary Filter
 
@@ -43,7 +43,7 @@ roll_estimates = np.zeros(len(df))
 # initial estimates
 prev_roll = roll_accel_estimates[0]
 prev_pitch = pitch_accel_estimates[0]
-prev_time = time[0] - (time[0]-21)     # time in ms, with 21ms being the avg time between samples
+prev_time = time[0] - 21   # time in ms, with 21ms being the avg time between samples
 
 for i in range(0, len(df)):
     cur_time = ((time[i] - prev_time) / 1000) # in seconds
@@ -58,4 +58,4 @@ for i in range(0, len(df)):
 df["CF_x"] = roll_estimates
 df["CF_y"] = pitch_estimates
 
-df.to_csv("MPU6050_Data_Modeling_P1/Data Modeling/imu_log_post_CF")
+df.to_csv("MPU6050_Data_Modeling_P1/Data Modeling/data/imu_log_post_CF.csv")

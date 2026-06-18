@@ -3,12 +3,11 @@ import sys
 
 PORT = "COM9"
 BAUD = 115200
-OUTPUT_FILE = "imu_log.csv"
 
 def main():
     saving = False
 
-    with serial.Serial(PORT, BAUD, timeout=1) as ser, open(OUTPUT_FILE, "w", newline="") as file:
+    with serial.Serial(PORT, BAUD, timeout=1) as ser, open("MPU6050_Data_Modeling_P1/Data Modeling/data/imu_log.csv", "w", newline="") as file:
         print (f"Listening on port: {PORT} at baud: {BAUD}.")
         print (f"Hold B1 to dump flash from STM32.")
 
